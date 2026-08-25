@@ -16,8 +16,24 @@ export interface ExportRow {
 	object_id: number;
 	category_id: number;
 	original_label: string;
-	label_verdict: string;
-	corrected_label: string;
+	original_taxon_id: string;
+	original_kingdom: string;
+	original_phylum: string;
+	original_class: string;
+	original_order: string;
+	original_family: string;
+	original_genus: string;
+	original_species: string;
+	original_common_name: string;
+	label_confirmed: string;
+	final_kingdom: string;
+	final_phylum: string;
+	final_class: string;
+	final_order: string;
+	final_family: string;
+	final_genus: string;
+	final_species: string;
+	final_common_name: string;
 	mask_verdict: string;
 	comment: string;
 }
@@ -33,8 +49,8 @@ export interface ExportPayload {
 }
 
 const EMPTY_REVIEW: TrackletReview = {
-	labelVerdict: null,
-	correctedLabel: "",
+	labelConfirmed: false,
+	taxonomy: null,
 	maskVerdict: null,
 	comment: "",
 };
@@ -85,7 +101,7 @@ export class ReviewStore {
 		let pending = 0;
 		for (const tracklet of tracklets) {
 			const review = this.get(tracklet.id);
-			const hasLabel = review.labelVerdict !== null;
+			const hasLabel = review.labelConfirmed;
 			const hasMask = review.maskVerdict !== null;
 			if (hasLabel && hasMask) verified += 1;
 			else if (hasLabel || hasMask) partial += 1;
@@ -115,22 +131,56 @@ export class ReviewStore {
 			"object_id",
 			"category_id",
 			"original_label",
-			"label_verdict",
-			"corrected_label",
+			"original_taxon_id",
+			"original_kingdom",
+			"original_phylum",
+			"original_class",
+			"original_order",
+			"original_family",
+			"original_genus",
+			"original_species",
+			"original_common_name",
+			"label_confirmed",
+			"final_kingdom",
+			"final_phylum",
+			"final_class",
+			"final_order",
+			"final_family",
+			"final_genus",
+			"final_species",
+			"final_common_name",
 			"mask_verdict",
 			"comment",
 		] as const;
 
 		const rows: ExportRow[] = clip.tracklets.map((tracklet) => {
 			const review = record[tracklet.id] ?? EMPTY_REVIEW;
+			const original = tracklet.taxonomy;
+			const final = review.taxonomy ?? tracklet.taxonomy;
 			return {
 				clip: clip.name,
 				tracklet_id: tracklet.id,
 				object_id: tracklet.objectId,
 				category_id: tracklet.categoryId,
 				original_label: tracklet.label,
-				label_verdict: review.labelVerdict ?? "",
-				corrected_label: review.correctedLabel,
+				original_taxon_id: toCell(original.taxonId),
+				original_kingdom: original.kingdom,
+				original_phylum: original.phylum,
+				original_class: original.class,
+				original_order: original.order,
+				original_family: original.family,
+				original_genus: original.genus,
+				original_species: original.species,
+				original_common_name: original.commonName,
+				label_confirmed: String(review.labelConfirmed),
+				final_kingdom: final.kingdom,
+				final_phylum: final.phylum,
+				final_class: final.class,
+				final_order: final.order,
+				final_family: final.family,
+				final_genus: final.genus,
+				final_species: final.species,
+				final_common_name: final.commonName,
 				mask_verdict: review.maskVerdict ?? "",
 				comment: review.comment,
 			};
@@ -159,4 +209,8 @@ export class ReviewStore {
 function escapeCsv(value: string): string {
 	if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
 	return value;
+}
+
+function toCell(value: string | number | null | undefined): string {
+	return value === null || value === undefined ? "" : String(value);
 }

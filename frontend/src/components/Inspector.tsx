@@ -1,18 +1,37 @@
 import type { ReactNode } from "react";
 import type {
-	LabelVerdict,
 	MaskVerdict,
+	TaxonomyKey,
 	Tracklet,
 	TrackletReview,
 } from "../types";
 import styles from "./Inspector.module.css";
 
+const TAXONOMY_FIELDS: {
+	key: TaxonomyKey;
+	label: string;
+	placeholder: string;
+}[] = [
+	{ key: "kingdom", label: "Kingdom", placeholder: "Animalia" },
+	{ key: "phylum", label: "Phylum", placeholder: "Chordata" },
+	{ key: "class", label: "Class", placeholder: "Mammalia" },
+	{ key: "order", label: "Order", placeholder: "Primates" },
+	{ key: "family", label: "Family", placeholder: "Atelidae" },
+	{ key: "genus", label: "Genus", placeholder: "Ateles" },
+	{ key: "species", label: "Species", placeholder: "Ateles geoffroyi" },
+	{
+		key: "commonName",
+		label: "Common name",
+		placeholder: "Geoffroy's Spider Monkey",
+	},
+];
+
 interface InspectorProps {
 	tracklet: Tracklet | null;
 	review: TrackletReview | null;
-	onLabelVerdict: (verdict: LabelVerdict) => void;
+	onTaxonomyField: (key: TaxonomyKey, value: string) => void;
+	onConfirmLabel: () => void;
 	onMaskVerdict: (verdict: MaskVerdict) => void;
-	onCorrectedLabel: (text: string) => void;
 	onComment: (text: string) => void;
 }
 
@@ -29,12 +48,10 @@ export function Inspector(props: InspectorProps) {
 		);
 	}
 
-	const current = review ?? {
-		labelVerdict: null,
-		correctedLabel: "",
-		maskVerdict: null,
-		comment: "",
-	};
+	const taxonomy = review?.taxonomy ?? tracklet.taxonomy;
+	const labelConfirmed = review?.labelConfirmed ?? false;
+	const maskVerdict = review?.maskVerdict ?? null;
+	const comment = review?.comment ?? "";
 
 	return (
 		<div className={styles.inspector}>
@@ -54,59 +71,54 @@ export function Inspector(props: InspectorProps) {
 
 			<section>
 				<h3 className={styles.sectionTitle}>Taxonomic label</h3>
-				<p className={styles.labelText}>{tracklet.label}</p>
-				<div className={styles.verdictGroup}>
-					<VerdictButton
-						active={current.labelVerdict === "correct"}
-						kind="good"
-						onClick={() => props.onLabelVerdict("correct")}
-					>
-						Correct
-					</VerdictButton>
-					<VerdictButton
-						active={current.labelVerdict === "incorrect"}
-						kind="bad"
-						onClick={() => props.onLabelVerdict("incorrect")}
-					>
-						Incorrect
-					</VerdictButton>
-					<VerdictButton
-						active={current.labelVerdict === "unsure"}
-						kind="warn"
-						onClick={() => props.onLabelVerdict("unsure")}
-					>
-						Unsure
-					</VerdictButton>
+				<div className={styles.taxoList}>
+					{TAXONOMY_FIELDS.map(({ key, label, placeholder }) => (
+						<label key={key} className={styles.taxoRow}>
+							<span className={styles.taxoLabel}>{label}</span>
+							<input
+								className={styles.field}
+								value={taxonomy[key]}
+								placeholder={placeholder}
+								onChange={(event) =>
+									props.onTaxonomyField(key, event.target.value)
+								}
+							/>
+						</label>
+					))}
 				</div>
-				{current.labelVerdict === "incorrect" && (
-					<input
-						className={styles.field}
-						placeholder="Corrected taxonomic label…"
-						value={current.correctedLabel}
-						onChange={(event) => props.onCorrectedLabel(event.target.value)}
-					/>
-				)}
+				<div className={styles.confirmRow}>
+					<button
+						type="button"
+						className={`btn btnPrimary ${styles.confirmBtn}`}
+						onClick={props.onConfirmLabel}
+					>
+						{labelConfirmed ? "Label confirmed" : "Confirm label"}
+					</button>
+					{labelConfirmed && (
+						<span className={styles.confirmedBadge}>✓ confirmed</span>
+					)}
+				</div>
 			</section>
 
 			<section>
 				<h3 className={styles.sectionTitle}>Mask quality</h3>
 				<div className={styles.verdictGroup}>
 					<VerdictButton
-						active={current.maskVerdict === "good"}
+						active={maskVerdict === "good"}
 						kind="good"
 						onClick={() => props.onMaskVerdict("good")}
 					>
 						Accurate
 					</VerdictButton>
 					<VerdictButton
-						active={current.maskVerdict === "bad"}
+						active={maskVerdict === "bad"}
 						kind="bad"
 						onClick={() => props.onMaskVerdict("bad")}
 					>
 						Inaccurate
 					</VerdictButton>
 					<VerdictButton
-						active={current.maskVerdict === "unsure"}
+						active={maskVerdict === "unsure"}
 						kind="warn"
 						onClick={() => props.onMaskVerdict("unsure")}
 					>
@@ -116,7 +128,7 @@ export function Inspector(props: InspectorProps) {
 				<textarea
 					className={`${styles.field} ${styles.comment}`}
 					placeholder="Optional note (e.g. mask drifts after frame 40)…"
-					value={current.comment}
+					value={comment}
 					onChange={(event) => props.onComment(event.target.value)}
 				/>
 			</section>

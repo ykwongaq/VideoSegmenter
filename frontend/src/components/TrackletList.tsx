@@ -21,7 +21,7 @@ interface TrackletListProps {
 
 function statusOf(review: TrackletReview | undefined): Status {
 	if (!review) return "todo";
-	const hasLabel = review.labelVerdict !== null;
+	const hasLabel = review.labelConfirmed;
 	const hasMask = review.maskVerdict !== null;
 	if (hasLabel && hasMask) return "done";
 	if (hasLabel || hasMask) return "partial";

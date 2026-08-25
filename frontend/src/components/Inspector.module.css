@@ -4,7 +4,8 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-height: 46%;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -106,4 +107,46 @@
   color: var(--muted);
   font-size: 0.85rem;
   margin: 0;
+}
+
+.taxoList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.taxoRow {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.taxoLabel {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  text-align: right;
+}
+
+.taxoRow .field {
+  margin-top: 0;
+}
+
+.confirmRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.confirmBtn {
+  flex: 1;
+}
+
+.confirmedBadge {
+  font-size: 0.75rem;
+  color: var(--good);
+  white-space: nowrap;
 }

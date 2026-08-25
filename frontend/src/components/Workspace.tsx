@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Clip } from "../lib/clip";
 import type { ZipArchive } from "../lib/zip";
-import type { LabelVerdict, MaskVerdict } from "../types";
+import type { MaskVerdict, TaxonomyKey } from "../types";
 import { ReviewStore } from "../lib/review";
 import { downloadText } from "../lib/format";
 import { VideoPanel } from "./VideoPanel";
@@ -66,28 +66,31 @@ export function Workspace({ clip, zip, onReset }: WorkspaceProps) {
 		[clip.tracklets],
 	);
 
-	const setLabelVerdict = useCallback(
-		(verdict: LabelVerdict) => {
-			if (selectedId === null) return;
-			store.update(selectedId, { labelVerdict: verdict });
+	const setTaxonomyField = useCallback(
+		(key: TaxonomyKey, value: string) => {
+			if (selectedId === null || !selected) return;
+			const current = store.get(selectedId);
+			const next = { ...(current.taxonomy ?? selected.taxonomy) };
+			next[key] = value;
+			store.update(selectedId, {
+				taxonomy: next,
+				labelConfirmed: false,
+			});
 			refresh();
 		},
-		[selectedId, store, refresh],
+		[selectedId, selected, store, refresh],
 	);
+
+	const confirmLabel = useCallback(() => {
+		if (selectedId === null) return;
+		store.update(selectedId, { labelConfirmed: true });
+		refresh();
+	}, [selectedId, store, refresh]);
 
 	const setMaskVerdict = useCallback(
 		(verdict: MaskVerdict) => {
 			if (selectedId === null) return;
 			store.update(selectedId, { maskVerdict: verdict });
-			refresh();
-		},
-		[selectedId, store, refresh],
-	);
-
-	const setCorrectedLabel = useCallback(
-		(text: string) => {
-			if (selectedId === null) return;
-			store.update(selectedId, { correctedLabel: text });
 			refresh();
 		},
 		[selectedId, store, refresh],
@@ -110,7 +113,7 @@ export function Workspace({ clip, zip, onReset }: WorkspaceProps) {
 		for (let k = 1; k <= total; k++) {
 			const tracklet = tracklets[(start + k) % total];
 			const review = store.get(tracklet.id);
-			if (!review.labelVerdict || !review.maskVerdict) {
+			if (!review.labelConfirmed || !review.maskVerdict) {
 				setSelectedId(tracklet.id);
 				if (tracklet.maskFrames.first >= 0)
 					setFrameIndex(tracklet.maskFrames.first);
@@ -163,12 +166,6 @@ export function Workspace({ clip, zip, onReset }: WorkspaceProps) {
 					event.preventDefault();
 					stepFrame(1);
 					break;
-				case "1":
-					setLabelVerdict("correct");
-					break;
-				case "2":
-					setLabelVerdict("incorrect");
-					break;
 				case "3":
 					setMaskVerdict("good");
 					break;
@@ -185,7 +182,7 @@ export function Workspace({ clip, zip, onReset }: WorkspaceProps) {
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [stepFrame, setLabelVerdict, setMaskVerdict, nextUnverified]);
+	}, [stepFrame, setMaskVerdict, nextUnverified]);
 
 	const handleExport = useCallback(() => {
 		const payload = ReviewStore.buildExport(clip, store.getRecord());
@@ -271,9 +268,9 @@ export function Workspace({ clip, zip, onReset }: WorkspaceProps) {
 					<Inspector
 						tracklet={selected}
 						review={selectedId !== null ? store.get(selectedId) : null}
-						onLabelVerdict={setLabelVerdict}
+						onTaxonomyField={setTaxonomyField}
+						onConfirmLabel={confirmLabel}
 						onMaskVerdict={setMaskVerdict}
-						onCorrectedLabel={setCorrectedLabel}
 						onComment={setComment}
 					/>
 				</aside>

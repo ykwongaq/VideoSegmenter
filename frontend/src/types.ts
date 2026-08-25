@@ -50,10 +50,39 @@ export interface RawAnnotation {
 	segmentations: RawRle[];
 }
 
+export interface RawCategory {
+	id: number;
+	taxon_id?: number;
+	kingdom?: string;
+	phylum?: string;
+	class?: string;
+	order?: string;
+	family?: string;
+	genus?: string;
+	species?: string;
+	common_name?: string;
+}
+
 export interface RawDataset {
 	videos: RawVideo[];
 	annotations: RawAnnotation[];
+	categories?: RawCategory[];
 }
+
+/** The taxonomic hierarchy attached to a tracklet's label. */
+export interface Taxonomy {
+	taxonId: number | null;
+	kingdom: string;
+	phylum: string;
+	class: string;
+	order: string;
+	family: string;
+	genus: string;
+	species: string;
+	commonName: string;
+}
+
+export type TaxonomyKey = Exclude<keyof Taxonomy, "taxonId">;
 
 /** An annotation promoted into a first-class tracklet used by the UI. */
 export interface Tracklet {
@@ -61,6 +90,7 @@ export interface Tracklet {
 	objectId: number;
 	categoryId: number;
 	label: string;
+	taxonomy: Taxonomy;
 	color: string;
 	segmentations: RawRle[];
 	maskFrames: {
@@ -70,12 +100,11 @@ export interface Tracklet {
 	};
 }
 
-export type LabelVerdict = "correct" | "incorrect" | "unsure";
 export type MaskVerdict = "good" | "bad" | "unsure";
 
 export interface TrackletReview {
-	labelVerdict: LabelVerdict | null;
-	correctedLabel: string;
+	labelConfirmed: boolean;
+	taxonomy: Taxonomy | null;
 	maskVerdict: MaskVerdict | null;
 	comment: string;
 }

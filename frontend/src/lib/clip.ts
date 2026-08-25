@@ -1,4 +1,10 @@
-import type { RawDataset, RawRle, Tracklet } from "../types";
+import type {
+	RawCategory,
+	RawDataset,
+	RawRle,
+	Taxonomy,
+	Tracklet,
+} from "../types";
 import type { ZipArchive } from "./zip";
 import { colorForIndex } from "./palette";
 
@@ -46,6 +52,10 @@ export class Clip {
 			throw new Error("Annotation JSON contains no frame list (file_names).");
 		}
 
+		const taxonomyByCategory = new Map<number, RawCategory>(
+			(raw.categories ?? []).map((category) => [category.id, category]),
+		);
+
 		const tracklets: Tracklet[] = (raw.annotations ?? [])
 			.filter((a) => a.video_id === video.id)
 			.sort((a, b) => a.id - b.id)
@@ -61,11 +71,27 @@ export class Clip {
 						last = j;
 					}
 				});
+
+				const category = taxonomyByCategory.get(a.category_id);
+				const species = category?.species || a.noun_phrase || "";
+				const taxonomy: Taxonomy = {
+					taxonId: category?.taxon_id ?? null,
+					kingdom: category?.kingdom ?? "",
+					phylum: category?.phylum ?? "",
+					class: category?.class ?? "",
+					order: category?.order ?? "",
+					family: category?.family ?? "",
+					genus: category?.genus ?? "",
+					species,
+					commonName: category?.common_name ?? "",
+				};
+
 				return {
 					id: a.id,
 					objectId: a.object_id,
 					categoryId: a.category_id,
-					label: a.noun_phrase ?? `object ${a.object_id}`,
+					label: a.noun_phrase ?? species ?? `object ${a.object_id}`,
+					taxonomy,
 					color: colorForIndex(i),
 					segmentations,
 					maskFrames: { first, last, count },
