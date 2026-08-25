@@ -1,0 +1,135 @@
+.list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.listHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.search {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.filters {
+  display: flex;
+  gap: 6px;
+}
+
+.filterBtn {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  font-size: 0.72rem;
+  padding: 4px 6px;
+  border-radius: 999px;
+}
+
+.filterBtn:hover {
+  background: var(--bg);
+}
+
+.filterActive {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.listScroll {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.empty {
+  color: var(--muted);
+  text-align: center;
+  padding: 20px 12px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.item:hover {
+  background: var(--bg);
+}
+
+.selected {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+
+.itemBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.itemLabel {
+  font-style: italic;
+  font-size: 0.92rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink);
+}
+
+.itemMeta {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.status {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.statusDone {
+  background: var(--good-soft);
+  color: var(--good);
+}
+
+.statusPartial {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.statusTodo {
+  background: var(--line);
+  color: var(--muted);
+}
