@@ -161,9 +161,9 @@ if __name__ == "__main__":
         "--compression",
         type=str,
         choices=sorted(COMPRESSION_OPTIONS),
-        default="deflated",
-        help="Compression method. 'deflated' (level 9) is the default and a good "
-        "balance of size vs. speed; 'lzma' gives the smallest files but is much slower.",
+        default="lzma",
+        help="Compression method. 'lzma' gives the smallest files but is much slower; "
+        "'deflated' (level 9) is a good balance of size vs. speed.",
     )
     parser.add_argument(
         "--workers",
