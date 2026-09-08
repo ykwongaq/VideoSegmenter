@@ -78,6 +78,13 @@ export class ZipArchive {
 
 		if (entry.method === 0) return new Blob([bytes.slice()]);
 		if (entry.method === 8) return new Blob([await inflateRaw(bytes)]);
+		if (entry.method === 14) {
+			throw new Error(
+				`${name}: LZMA compression is not supported by the browser ZIP reader. ` +
+					"Re-export the project with deflated compression " +
+					"(make_projects.py --compression deflated).",
+			);
+		}
 		throw new Error(
 			`Unsupported compression method ${entry.method} for ${name}`,
 		);

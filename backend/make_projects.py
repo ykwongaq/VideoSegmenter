@@ -150,7 +150,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--annotation_dataset",
         type=str,
-        default="/home/davidwong/Downloads/merged_species",
+        default="/home/davidwong/Downloads/annotations",
     )
     parser.add_argument(
         "--output_dataset",
@@ -161,9 +161,12 @@ if __name__ == "__main__":
         "--compression",
         type=str,
         choices=sorted(COMPRESSION_OPTIONS),
-        default="lzma",
-        help="Compression method. 'lzma' gives the smallest files but is much slower; "
-        "'deflated' (level 9) is a good balance of size vs. speed.",
+        default="deflated",
+        help="Compression method. Defaults to 'deflated' because the web reviewer can "
+        "only read STORED (0) and DEFLATE (8) entries. 'lzma' produces smaller files "
+        "but the reviewer cannot open them (Unsupported compression method 14); "
+        "'bzip2' is likewise unsupported. 'deflated' (level 9) is the recommended "
+        "balance of size vs. speed.",
     )
     parser.add_argument(
         "--workers",

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Clip } from "../lib/clip";
 import type { ZipArchive } from "../lib/zip";
-import type { MaskVerdict, TaxonomyKey } from "../types";
+import type { MaskVerdict, Taxonomy, TaxonomyKey } from "../types";
 import { ReviewStore } from "../lib/review";
 import { downloadText } from "../lib/format";
 import { VideoPanel } from "./VideoPanel";
@@ -79,6 +79,18 @@ export function Workspace({ clip, zip, onReset }: WorkspaceProps) {
 			refresh();
 		},
 		[selectedId, selected, store, refresh],
+	);
+
+	const applyTaxonomy = useCallback(
+		(taxonomy: Taxonomy) => {
+			if (selectedId === null) return;
+			store.update(selectedId, {
+				taxonomy,
+				labelConfirmed: false,
+			});
+			refresh();
+		},
+		[selectedId, store, refresh],
 	);
 
 	const confirmLabel = useCallback(() => {
@@ -269,6 +281,7 @@ export function Workspace({ clip, zip, onReset }: WorkspaceProps) {
 						tracklet={selected}
 						review={selectedId !== null ? store.get(selectedId) : null}
 						onTaxonomyField={setTaxonomyField}
+						onApplyTaxonomy={applyTaxonomy}
 						onConfirmLabel={confirmLabel}
 						onMaskVerdict={setMaskVerdict}
 						onComment={setComment}
