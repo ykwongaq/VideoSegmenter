@@ -5,7 +5,10 @@ import type { DecodedMask, RawRle } from "../types";
  * masks (size + counts) and receives the decoded foreground runs, so no RLE
  * decoding happens in the browser.
  */
-const ENDPOINT = "/api/decode/masks";
+// Backend base URL from `VITE_API_BASE_URL` (production builds). Falls back to
+// a relative `/api` path so the dev server keeps using the Vite proxy.
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/+$/, "");
+const ENDPOINT = `${API_BASE}/api/decode/masks`;
 
 export async function decodeMasks(masks: RawRle[]): Promise<DecodedMask[]> {
 	if (masks.length === 0) return [];
