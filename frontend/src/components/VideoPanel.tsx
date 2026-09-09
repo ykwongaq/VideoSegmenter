@@ -3,9 +3,9 @@ import type { Clip } from "../lib/clip";
 import type { ZipArchive } from "../lib/zip";
 import { FrameCache } from "../lib/frameCache";
 import { MaskRenderer } from "../lib/mask";
-import { decodeMasks, MaskCache } from "../lib/maskApi";
+import { MaskCache, type MaskRequest } from "../lib/maskApi";
 import { formatTimecode } from "../lib/format";
-import type { DecodedMask, RawRle, Tracklet } from "../types";
+import type { Tracklet } from "../types";
 import styles from "./VideoPanel.module.css";
 
 interface VideoPanelProps {
@@ -40,6 +40,10 @@ export function VideoPanel(props: VideoPanelProps) {
 		maskCacheRef.current = new MaskCache();
 	}
 
+	// Frame index currently painted on the canvas; used to guard the mask
+	// overlay against compositing stale masks over a newer frame.
+	const paintedFrameRef = useRef(-1);
+
 	const [viewport, setViewport] = useState({ w: 0, h: 0 });
 
 	useEffect(() => {
@@ -66,6 +70,42 @@ export function VideoPanel(props: VideoPanelProps) {
 		}
 		cache.preload(wanted);
 	}, [props.frameIndex, props.clip]);
+
+	// Prefetch masks for the frames just ahead of the playhead so that, by the
+	// time a frame is displayed during playback, its mask is already decoded
+	// and cached (and therefore drawn synchronously on the first pass).
+	useEffect(() => {
+		const cache = maskCacheRef.current;
+		if (!cache) return;
+		const total = props.clip.frameCount;
+		const visible = props.showAllMasks
+			? props.clip.tracklets
+			: props.clip.tracklets.filter((t) => t.id === props.selectedTrackletId);
+
+		const requests: MaskRequest[] = [];
+		const MAX_PREFETCH_MASKS = 64;
+		for (let d = 1; d <= 8 && requests.length < MAX_PREFETCH_MASKS; d++) {
+			const index = props.frameIndex + d;
+			if (index >= total) break;
+			for (const tracklet of visible) {
+				if (requests.length >= MAX_PREFETCH_MASKS) break;
+				const payload = props.clip.rawMaskAt(tracklet, index);
+				if (!payload) continue;
+				requests.push({
+					trackletId: tracklet.id,
+					frameIndex: index,
+					payload,
+				});
+			}
+		}
+		if (requests.length === 0) return;
+		void cache.resolveBatch(requests).catch(() => {});
+	}, [
+		props.frameIndex,
+		props.clip,
+		props.selectedTrackletId,
+		props.showAllMasks,
+	]);
 
 	// Render the current frame and its mask overlay.
 	useEffect(() => {
@@ -115,45 +155,39 @@ export function VideoPanel(props: VideoPanelProps) {
 				ctx.font = "14px system-ui";
 				ctx.fillText("Frame unavailable", drawX + 12, drawY + 24);
 			}
+			paintedFrameRef.current = props.frameIndex;
 
 			const cache = maskCacheRef.current!;
 			const visible = props.showAllMasks
 				? props.clip.tracklets
 				: props.clip.tracklets.filter((t) => t.id === props.selectedTrackletId);
 
-			const resolved: { tracklet: Tracklet; decoded: DecodedMask }[] = [];
-			const missing: { tracklet: Tracklet; payload: RawRle }[] = [];
+			const requests: MaskRequest[] = [];
+			const requestTracklets: Tracklet[] = [];
 			for (const tracklet of visible) {
 				const payload = props.clip.rawMaskAt(tracklet, props.frameIndex);
 				if (!payload) continue;
-				const key = MaskCache.key(tracklet.id, props.frameIndex);
-				const cached = cache.get(key);
-				if (cached) resolved.push({ tracklet, decoded: cached });
-				else missing.push({ tracklet, payload });
+				requests.push({
+					trackletId: tracklet.id,
+					frameIndex: props.frameIndex,
+					payload,
+				});
+				requestTracklets.push(tracklet);
 			}
 
-			if (missing.length > 0) {
-				try {
-					const decodedList = await decodeMasks(
-						missing.map((entry) => entry.payload),
-					);
-					decodedList.forEach((decoded, index) => {
-						const entry = missing[index];
-						cache.set(
-							MaskCache.key(entry.tracklet.id, props.frameIndex),
-							decoded,
-						);
-						resolved.push({ tracklet: entry.tracklet, decoded });
-					});
-				} catch {
-					// Mask decoding failed — draw the frame without its overlay.
-				}
-			}
-			if (cancelled) return;
+			const decodedList =
+				requests.length > 0 ? await cache.resolveBatch(requests) : [];
+
+			// Only composite if the canvas still shows the frame these masks
+			// belong to; a slow decode must not paint stale masks over a newer
+			// frame (that frame's own render handles its overlay).
+			if (paintedFrameRef.current !== props.frameIndex) return;
 
 			maskRenderer.clear();
-			for (const { tracklet, decoded } of resolved) {
-				maskRenderer.drawRuns(decoded.runs, tracklet.color);
+			for (let i = 0; i < requestTracklets.length; i++) {
+				const decoded = decodedList[i];
+				if (!decoded) continue;
+				maskRenderer.drawRuns(decoded.runs, requestTracklets[i].color);
 			}
 
 			ctx.save();
