@@ -23,18 +23,6 @@ interface VideoPanelProps {
 	onMaskOpacityChange: (value: number) => void;
 }
 
-/**
- * `ImageBitmap.closed` is a standard readonly flag in browsers, but it is not
- * present in this TypeScript version's DOM typings (only `close()` is), so
- * access it through this typed helper. A closed bitmap is detached and must
- * not be passed to `drawImage`.
- */
-function isClosedBitmap(bitmap: ImageBitmap): boolean {
-	return (
-		(bitmap as ImageBitmap & { readonly closed?: boolean }).closed ?? false
-	);
-}
-
 export function VideoPanel(props: VideoPanelProps) {
 	const wrapRef = useRef<HTMLDivElement>(null);
 	const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -82,57 +70,11 @@ export function VideoPanel(props: VideoPanelProps) {
 	// Render the current frame and its mask overlay.
 	useEffect(() => {
 		let cancelled = false;
-		const controller = new AbortController();
 
 		const draw = async () => {
 			const canvas = canvasRef.current;
 			const maskRenderer = maskRef.current;
 			if (!canvas || !maskRenderer) return;
-			if (viewport.w === 0 || viewport.h === 0) return;
-
-			const cache = maskCacheRef.current!;
-			const visible = props.showAllMasks
-				? props.clip.tracklets
-				: props.clip.tracklets.filter((t) => t.id === props.selectedTrackletId);
-
-			// Masks already decoded for this frame (painted immediately) vs.
-			// masks that still need a backend round-trip (painted when ready).
-			const resolved: { tracklet: Tracklet; decoded: DecodedMask }[] = [];
-			const missing: { tracklet: Tracklet; payload: RawRle }[] = [];
-			for (const tracklet of visible) {
-				const payload = props.clip.rawMaskAt(tracklet, props.frameIndex);
-				if (!payload) continue;
-				const key = MaskCache.key(tracklet.id, props.frameIndex);
-				const cached = cache.get(key);
-				if (cached) resolved.push({ tracklet, decoded: cached });
-				else missing.push({ tracklet, payload });
-			}
-
-			// Fetch the current frame and paint it as soon as it is ready. Mask
-			// decoding is intentionally NOT awaited here: it is a network call
-			// that can be slower than one playback frame, and blocking the paint
-			// on it lets requests pile up until the video freezes mid-play. The
-			// frame is painted first; decoded masks are layered on when they
-			// arrive. The canvas is only cleared once, right before the frame is
-			// drawn, so playback never flashes a black/half-painted frame.
-			let frame: ImageBitmap | null = null;
-			try {
-				frame = await cacheRef.current!.get(props.frameIndex);
-			} catch {
-				frame = null;
-			}
-			if (cancelled) return;
-			// A bitmap closed by a concurrent cache eviction is detached; treat
-			// it as unavailable rather than painting it.
-			if (frame && isClosedBitmap(frame)) frame = null;
-
-			const frameWidth = frame ? frame.width : props.clip.width;
-			const frameHeight = frame ? frame.height : props.clip.height;
-			const scale = Math.min(viewport.w / frameWidth, viewport.h / frameHeight);
-			const drawWidth = frameWidth * scale;
-			const drawHeight = frameHeight * scale;
-			const drawX = (viewport.w - drawWidth) / 2;
-			const drawY = (viewport.h - drawHeight) / 2;
 
 			const dpr = window.devicePixelRatio || 1;
 			const backingWidth = Math.max(1, Math.round(viewport.w * dpr));
@@ -143,31 +85,25 @@ export function VideoPanel(props: VideoPanelProps) {
 			const ctx = canvas.getContext("2d");
 			if (!ctx) return;
 			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-			// Draw only the overlay on top of the already-painted frame, without
-			// clearing the canvas (so no flicker when a late decode lands).
-			const paintOverlay = (
-				masks: { tracklet: Tracklet; decoded: DecodedMask }[],
-			) => {
-				maskRenderer.clear();
-				for (const { tracklet, decoded } of masks) {
-					maskRenderer.drawRuns(decoded.runs, tracklet.color);
-				}
-				ctx.save();
-				ctx.globalAlpha = props.maskOpacity;
-				ctx.drawImage(
-					maskRenderer.canvasElement,
-					drawX,
-					drawY,
-					drawWidth,
-					drawHeight,
-				);
-				ctx.restore();
-			};
-
-			// Clear once, then paint frame + any masks that were already cached.
 			ctx.fillStyle = "#000";
 			ctx.fillRect(0, 0, viewport.w, viewport.h);
+			if (viewport.w === 0 || viewport.h === 0) return;
+
+			let frame: ImageBitmap | null = null;
+			try {
+				frame = await cacheRef.current!.get(props.frameIndex);
+			} catch {
+				frame = null;
+			}
+			if (cancelled) return;
+
+			const frameWidth = frame ? frame.width : props.clip.width;
+			const frameHeight = frame ? frame.height : props.clip.height;
+			const scale = Math.min(viewport.w / frameWidth, viewport.h / frameHeight);
+			const drawWidth = frameWidth * scale;
+			const drawHeight = frameHeight * scale;
+			const drawX = (viewport.w - drawWidth) / 2;
+			const drawY = (viewport.h - drawHeight) / 2;
 
 			if (frame) {
 				ctx.drawImage(frame, drawX, drawY, drawWidth, drawHeight);
@@ -179,19 +115,27 @@ export function VideoPanel(props: VideoPanelProps) {
 				ctx.fillText("Frame unavailable", drawX + 12, drawY + 24);
 			}
 
-			paintOverlay(resolved);
+			const cache = maskCacheRef.current!;
+			const visible = props.showAllMasks
+				? props.clip.tracklets
+				: props.clip.tracklets.filter((t) => t.id === props.selectedTrackletId);
 
-			// Decode this frame's missing masks in the background, then layer
-			// them on top once they arrive (only if this frame is still current).
-			// Stale requests are aborted on cleanup so they cannot back up
-			// against the backend and stall playback.
+			const resolved: { tracklet: Tracklet; decoded: DecodedMask }[] = [];
+			const missing: { tracklet: Tracklet; payload: RawRle }[] = [];
+			for (const tracklet of visible) {
+				const payload = props.clip.rawMaskAt(tracklet, props.frameIndex);
+				if (!payload) continue;
+				const key = MaskCache.key(tracklet.id, props.frameIndex);
+				const cached = cache.get(key);
+				if (cached) resolved.push({ tracklet, decoded: cached });
+				else missing.push({ tracklet, payload });
+			}
+
 			if (missing.length > 0) {
 				try {
 					const decodedList = await decodeMasks(
 						missing.map((entry) => entry.payload),
-						controller.signal,
 					);
-					if (cancelled) return;
 					decodedList.forEach((decoded, index) => {
 						const entry = missing[index];
 						cache.set(
@@ -200,18 +144,32 @@ export function VideoPanel(props: VideoPanelProps) {
 						);
 						resolved.push({ tracklet: entry.tracklet, decoded });
 					});
-					paintOverlay(resolved);
 				} catch {
-					// Aborted (frame moved on) or decode failed — the frame is
-					// already on screen; show it without this overlay.
+					// Mask decoding failed — draw the frame without its overlay.
 				}
 			}
+			if (cancelled) return;
+
+			maskRenderer.clear();
+			for (const { tracklet, decoded } of resolved) {
+				maskRenderer.drawRuns(decoded.runs, tracklet.color);
+			}
+
+			ctx.save();
+			ctx.globalAlpha = props.maskOpacity;
+			ctx.drawImage(
+				maskRenderer.canvasElement,
+				drawX,
+				drawY,
+				drawWidth,
+				drawHeight,
+			);
+			ctx.restore();
 		};
 
 		void draw();
 		return () => {
 			cancelled = true;
-			controller.abort();
 		};
 	}, [
 		viewport,

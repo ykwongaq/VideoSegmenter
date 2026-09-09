@@ -8,7 +8,6 @@ const MAX_ENTRIES = 40;
  */
 export class FrameCache {
 	private readonly cache = new Map<number, ImageBitmap>();
-	private readonly pending = new Map<number, Promise<ImageBitmap>>();
 	private readonly order: number[] = [];
 	private readonly zip: ZipArchive;
 	private readonly frameNames: string[];
@@ -25,21 +24,6 @@ export class FrameCache {
 			return cached;
 		}
 
-		// Deduplicate concurrent decodes of the same frame. Otherwise two
-		// overlapping get() calls for a missing frame would both decode, push
-		// the index twice, and an eviction could close the bitmap that one of
-		// the callers was just handed.
-		const inFlight = this.pending.get(index);
-		if (inFlight) return inFlight;
-
-		const promise = this.decode(index).finally(() => {
-			this.pending.delete(index);
-		});
-		this.pending.set(index, promise);
-		return promise;
-	}
-
-	private async decode(index: number): Promise<ImageBitmap> {
 		const name = this.frameNames[index];
 		if (name === undefined)
 			throw new Error(`Frame index out of range: ${index}`);
