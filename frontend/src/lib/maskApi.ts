@@ -10,13 +10,17 @@ import type { DecodedMask, RawRle } from "../types";
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/+$/, "");
 const ENDPOINT = `${API_BASE}/api/decode/masks`;
 
-export async function decodeMasks(masks: RawRle[]): Promise<DecodedMask[]> {
+export async function decodeMasks(
+	masks: RawRle[],
+	signal?: AbortSignal,
+): Promise<DecodedMask[]> {
 	if (masks.length === 0) return [];
 
 	const response = await fetch(ENDPOINT, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({ masks }),
+		signal,
 	});
 	if (!response.ok) {
 		throw new Error(`Mask decode request failed (${response.status}).`);
