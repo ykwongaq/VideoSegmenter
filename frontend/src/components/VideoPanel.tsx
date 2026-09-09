@@ -107,6 +107,46 @@ export function VideoPanel(props: VideoPanelProps) {
 		props.showAllMasks,
 	]);
 
+	// Bulk-decode the selected tracklet's masks (in frame order, chunked) so
+	// first-pass playback already has every mask cached and never has to wait
+	// on the network. Cancelled when the selection changes.
+	useEffect(() => {
+		const cache = maskCacheRef.current;
+		if (!cache) return;
+		const tracklet = props.clip.tracklets.find(
+			(t) => t.id === props.selectedTrackletId,
+		);
+		if (!tracklet) return;
+
+		const requests: MaskRequest[] = [];
+		for (let index = 0; index < props.clip.frameCount; index++) {
+			const payload = props.clip.rawMaskAt(tracklet, index);
+			if (!payload) continue;
+			requests.push({
+				trackletId: tracklet.id,
+				frameIndex: index,
+				payload,
+			});
+		}
+
+		let cancelled = false;
+		const CHUNK_SIZE = 64;
+		const pump = async () => {
+			for (
+				let offset = 0;
+				offset < requests.length && !cancelled;
+				offset += CHUNK_SIZE
+			) {
+				await cache.resolveBatch(requests.slice(offset, offset + CHUNK_SIZE));
+			}
+		};
+		void pump().catch(() => {});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [props.clip, props.selectedTrackletId]);
+
 	// Render the current frame and its mask overlay.
 	useEffect(() => {
 		let cancelled = false;
