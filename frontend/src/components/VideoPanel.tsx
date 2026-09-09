@@ -84,10 +84,6 @@ export function VideoPanel(props: VideoPanelProps) {
 
 			const ctx = canvas.getContext("2d");
 			if (!ctx) return;
-			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-			ctx.fillStyle = "#000";
-			ctx.fillRect(0, 0, viewport.w, viewport.h);
-			if (viewport.w === 0 || viewport.h === 0) return;
 
 			let frame: ImageBitmap | null = null;
 			try {
@@ -96,6 +92,7 @@ export function VideoPanel(props: VideoPanelProps) {
 				frame = null;
 			}
 			if (cancelled) return;
+			if (viewport.w === 0 || viewport.h === 0) return;
 
 			const frameWidth = frame ? frame.width : props.clip.width;
 			const frameHeight = frame ? frame.height : props.clip.height;
@@ -104,6 +101,10 @@ export function VideoPanel(props: VideoPanelProps) {
 			const drawHeight = frameHeight * scale;
 			const drawX = (viewport.w - drawWidth) / 2;
 			const drawY = (viewport.h - drawHeight) / 2;
+
+			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+			ctx.fillStyle = "#000";
+			ctx.fillRect(0, 0, viewport.w, viewport.h);
 
 			if (frame) {
 				ctx.drawImage(frame, drawX, drawY, drawWidth, drawHeight);

@@ -9,6 +9,7 @@ const MAX_ENTRIES = 40;
 export class FrameCache {
 	private readonly cache = new Map<number, ImageBitmap>();
 	private readonly order: number[] = [];
+	private readonly inflight = new Map<number, Promise<ImageBitmap>>();
 	private readonly zip: ZipArchive;
 	private readonly frameNames: string[];
 
@@ -24,6 +25,19 @@ export class FrameCache {
 			return cached;
 		}
 
+		const pending = this.inflight.get(index);
+		if (pending) return pending;
+
+		const promise = this.load(index);
+		this.inflight.set(index, promise);
+		try {
+			return await promise;
+		} finally {
+			this.inflight.delete(index);
+		}
+	}
+
+	private async load(index: number): Promise<ImageBitmap> {
 		const name = this.frameNames[index];
 		if (name === undefined)
 			throw new Error(`Frame index out of range: ${index}`);
