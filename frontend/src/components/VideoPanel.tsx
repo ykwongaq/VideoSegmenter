@@ -23,6 +23,18 @@ interface VideoPanelProps {
 	onMaskOpacityChange: (value: number) => void;
 }
 
+/**
+ * `ImageBitmap.closed` is a standard readonly flag in browsers, but it is not
+ * present in this TypeScript version's DOM typings (only `close()` is), so
+ * access it through this typed helper. A closed bitmap is detached and must
+ * not be passed to `drawImage`.
+ */
+function isClosedBitmap(bitmap: ImageBitmap): boolean {
+	return (
+		(bitmap as ImageBitmap & { readonly closed?: boolean }).closed ?? false
+	);
+}
+
 export function VideoPanel(props: VideoPanelProps) {
 	const wrapRef = useRef<HTMLDivElement>(null);
 	const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -128,7 +140,7 @@ export function VideoPanel(props: VideoPanelProps) {
 					const bitmap = await cacheRef.current!.get(props.frameIndex);
 					// A bitmap closed by a concurrent cache eviction is
 					// detached; treat it as unavailable rather than painting it.
-					return bitmap.closed ? null : bitmap;
+					return isClosedBitmap(bitmap) ? null : bitmap;
 				} catch {
 					return null;
 				}
